@@ -1,31 +1,37 @@
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <time.h>
+#include <ctime>
 #include <algorithm>
+#include <memory>
+#include <iostream>
+#include <cstdlib>
+#include <climits>
+#include <cstdio>
 
 #define UINT32_BIT_SIZE 32
 
-/**
-	\brief Возвращает указанный бит из массива значений в памяти GPU
-	\param[in] arr Массив значений
-	\param[in] n   Порядковый номер бита
-	\return Указанный бит (0 или 1)
- */
+char* int2bin(uint32_t i)
+{
+	size_t bits = sizeof(uint32_t) * CHAR_BIT;
+
+    char* str = (char *)malloc(bits + 1);
+    if(!str) return NULL;
+    str[bits] = 0;
+
+    unsigned u = *(unsigned *)&i;
+	for(; bits--; u >>= 1)
+        str[bits] = u & 1 ? '1' : '0';
+
+    return str;
+}
+
 __device__ 
-uint32_t inline d_get_bit(const uint32_t* arr, const uint32_t n)
+bool inline d_get_bit(const uint32_t* arr, const uint32_t n)
 {
 	uint32_t cell_idx = n / UINT32_BIT_SIZE;
 	return arr[cell_idx] & (uint32_t(1) << (n % UINT32_BIT_SIZE));
 }
 
 
-/**
-	\brief Устанавливает значение указанного бита в указанное значение в памяти на GPU
-	\param[in, out] arr Массив значений
-	\param[in]      n   Порядковый номер бита
-	\param[in]      bit_value Значение устанавливаемого бита
- */
 __device__ 
 void inline d_set_bit(uint32_t* arr, const uint32_t n, const uint32_t bit_value)
 {
@@ -36,60 +42,43 @@ void inline d_set_bit(uint32_t* arr, const uint32_t n, const uint32_t bit_value)
 		arr[cell_idx] = arr[cell_idx] & ~(uint32_t(1) << (n % UINT32_BIT_SIZE));
 }
 
-
-/**
-	\brief Функция для вычисления произведения битовых матриц на GPU
-
-	Каждый CUDA thread вычисляет произведение вектора-строки матрицы A на вектор
-	столбец матрицы B. В качестве операций сложения и умножений используется XOR и 
-	битовое AND соответственно. Результат операции сохраняется в соответствующую 
-	ячейку матрицы C.
-
-	\param[in]  A Левый множитель в матричном произведении
-	\param[in]  a_rows Количество строк в матрице А
-	\param[in]  a_cols Количество столбцов в матрице А
-	\param[in]  B Правый множитель в матричном произведении
-	\param[in]  b_rows Количество строк в матрице B
-	\param[in]  b_cols Количество столбцов в матрице B
-	\param[out] C Результат матричного произведения
- */
 __global__ 
 void gpu_multiplication(
 	const uint32_t* const A, const uint32_t a_rows, const uint32_t a_cols,
 	const uint32_t* const B, const uint32_t b_rows, const uint32_t b_cols, uint32_t* const C) 
 {
-	uint32_t index = threadIdx.x + blockIdx.x * blockDim.x;
-	uint32_t sum = 0;
+	unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
 
 	if(index < a_rows)
-		for (uint32_t i = 0; i < b_cols; i++)											 
+	{
+		for (unsigned int i = 0; i < b_rows; i++)											 
 		{
-			for (uint32_t j = 0; j < a_cols; j++)											
-				sum ^= d_get_bit(A, index * a_cols + j) & d_get_bit(B, j * b_cols + i);
-			d_set_bit(C, index * b_cols + i, sum);
+			bool sum = 0;
+			for (unsigned int j = 0; j < a_cols; j++)
+			{											
+				sum ^= d_get_bit(A, index * a_cols + j) & d_get_bit(B, i * b_cols + j);
+			}
+			d_set_bit(C, index * b_rows + i, sum);
 		}
+	}
+}
+
+__global__
+void gpu_transpose(uint32_t* dst, const uint32_t* const src, const uint32_t rows, const uint32_t cols)
+{
+	for(int i = 0; i < rows; ++i)
+		for (int j = 0; j < cols; ++j)
+			d_set_bit(dst, i * cols + j, d_get_bit(src, j * rows + i));
 }
 
 
-/**
-	\brief Возвращает указанный бит из массива значений в памяти CPU
-	\param[in] arr Массив значений
-	\param[in] n   Порядковый номер бита
-	\return Указанный бит (0 или 1)
- */
-uint32_t inline h_get_bit(const uint32_t* arr, const uint32_t n)
+bool inline h_get_bit(const uint32_t* arr, const uint32_t n)
 {
 	uint32_t cell_idx = n / UINT32_BIT_SIZE;
 	return arr[cell_idx] & (uint32_t(1) << (n % UINT32_BIT_SIZE));
 }
 
 
-/**
-	\brief Устанавливает значение указанного бита в указанное значение в памяти на CPU
-	\param[in,out] arr Массив значений
-	\param[in]      n   Порядковый номер бита
-	\param[in]      bit_value Значение устанавливаемого бита
-*/
 void inline h_set_bit(uint32_t* arr, const uint32_t n, const uint32_t bit_value)
 {
 	uint32_t cell_idx = n / UINT32_BIT_SIZE;
@@ -99,31 +88,15 @@ void inline h_set_bit(uint32_t* arr, const uint32_t n, const uint32_t bit_value)
 		arr[cell_idx] = arr[cell_idx] & ~(uint32_t(1) << (n % UINT32_BIT_SIZE));
 }
 
-
-/**
-	\brief Функция для вычисления произведения битовых матриц на CPU
-
-	В однопоточном режиме функция вычисляет произведение битовых матриц
-	А и B. В качестве операций сложения и умножений используется XOR и 
-	битовое AND соответственно. Результат операции сохраняется в матрицу С.
-
-	\param[in]  A Левый множитель в матричном произведении
-	\param[in]  a_rows Количество строк в матрице А
-	\param[in]  a_cols Количество столбцов в матрице А
-	\param[in]  B Правый множитель в матричном произведении
-	\param[in]  b_rows Количество строк в матрице B
-	\param[in]  b_cols Количество столбцов в матрице B
-	\param[out] C Результат матричного произведения
- */
 void cpu_multiplication(
 	const uint32_t* const A, const uint32_t a_rows, const uint32_t a_cols,
 	const uint32_t* const B, const uint32_t b_rows, const uint32_t b_cols, uint32_t* const C)
 {
-	for (uint32_t k = 0; k < a_rows; k++)
+	for (unsigned int k = 0; k < a_rows; k++)
 	{
-		uint32_t sum = 0;
-		for (uint32_t i = 0; i < b_cols; i++)
+		for (unsigned int i = 0; i < b_cols; i++)
 		{
+			bool sum = 0;
 			for (uint32_t j = 0; j < a_cols; j++)										
 				sum ^= h_get_bit(A, k * a_cols + j) & h_get_bit(B, j * b_cols + i);
 			h_set_bit(C, k * b_cols + i, sum);
@@ -131,22 +104,24 @@ void cpu_multiplication(
 	}
 }
 
+void cpu_transpose(uint32_t* dst, const uint32_t* const src, const uint32_t rows, const uint32_t cols)
+{
+	for(unsigned int i = 0; i < rows; ++i)
+		for (unsigned int j = 0; j < cols; ++j)
+			h_set_bit(dst, i * cols + j, h_get_bit(src, j * rows + i));
+}
+
 
 int main() 
 {
-	uint32_t a_rows = 1024, a_cols = 1024;
-	uint32_t b_rows = a_cols, b_cols = 2048;
+	const uint32_t a_rows = 32, a_cols = 32;
+	const uint32_t b_rows = 32, b_cols = 32;
 
-	uint32_t* h_A      = (uint32_t *)calloc(a_rows * a_cols / 4, sizeof(uint32_t));
-	uint32_t* h_B      = (uint32_t *)calloc(b_rows * b_cols / 4, sizeof(uint32_t));
-	uint32_t* h_C      = (uint32_t *)calloc(a_rows * b_cols / 4, sizeof(uint32_t));
-	uint32_t* h_result = (uint32_t *)calloc(a_rows * b_cols / 4, sizeof(uint32_t));
-
-	if (!h_A || !h_B || !h_C || !h_result) 
-	{
-		printf("Allocation error!");
-		exit(1);
-	}
+	uint32_t* h_A = new uint32_t[a_rows * a_cols / 4];
+	uint32_t* h_B = new uint32_t[b_rows * b_cols / 4];
+	uint32_t* h_B_tr = new uint32_t[b_rows * b_cols / 4];
+	uint32_t* h_C = new uint32_t[a_rows * b_cols / 4];
+	uint32_t* h_result = new uint32_t[a_rows * b_cols / 4];
 
 	for (uint32_t i = 0; i < a_rows; i++)
 		for (uint32_t j = 0; j < a_cols / UINT32_BIT_SIZE; j++)
@@ -156,10 +131,11 @@ int main()
 		for (uint32_t j = 0; j < b_cols / UINT32_BIT_SIZE; j++)
 			h_B[i * b_cols / UINT32_BIT_SIZE + j] = (uint32_t)rand();
 
-	uint32_t *d_A = 0, *d_B = 0, *d_C = 0;
+	uint32_t *d_A = 0, *d_B = 0, *d_B_tr, *d_C = 0;
 
 	cudaMalloc((void **)&d_A, a_rows * a_cols);
 	cudaMalloc((void **)&d_B, b_rows * b_cols);
+	cudaMalloc((void **)&d_B_tr, b_rows * b_cols);
 	cudaMalloc((void **)&d_C, a_rows * b_cols);
 
 	cudaMemcpy((void *)d_A, (const void*)h_A, a_rows * a_cols, cudaMemcpyHostToDevice);
@@ -173,7 +149,8 @@ int main()
 	cudaEventCreate(&timer_start); cudaEventCreate(&timer_stop);
 	cudaEventRecord(timer_start, 0);
 
-	gpu_multiplication <<< grid_size, block_size >>> (d_A, a_rows, a_cols, d_B, b_rows, b_cols, d_C);
+	gpu_transpose <<< 1, 1 >>> (d_B_tr, d_B, b_rows, b_cols);
+	gpu_multiplication <<< grid_size, block_size >>> (d_A, a_rows, a_cols, d_B_tr, b_cols, b_rows, d_C);
 
 	cudaEventRecord(timer_stop);
 	cudaEventSynchronize(timer_stop);
@@ -182,7 +159,7 @@ int main()
 	cudaError_t error = cudaGetLastError();
 	if (error != cudaSuccess)
 	{
-		printf("%s\n", cudaGetErrorString(error));
+		std::cout << cudaGetErrorString(error) << std::endl;
 		return 1;
 	}
 
@@ -190,7 +167,8 @@ int main()
 	cpu_multiplication(h_A, a_rows, a_cols, h_B, b_rows, b_cols, h_C);
 	cpu_time = clock() - cpu_time;
 	
-	printf("GPU elapsed time: %.2f ms\nCPU elapsed time: %.2f ms\n", gpu_time, cpu_time);
+	std::cout << "GPU elapsed time: " << gpu_time << " ms" << std::endl;
+	std::cout << "CPU elapsed time: " << cpu_time <<" ms" << std::endl;
 
 	cudaMemcpy((void **)h_result, (const void**)d_C, a_rows * b_cols, cudaMemcpyDeviceToHost);
 
@@ -198,23 +176,27 @@ int main()
 	for (uint32_t i = 0; i < a_rows * b_cols / UINT32_BIT_SIZE; i++)
 		if (h_result[i] != h_C[i])
 		{
-			printf("Error! h_result[%d] != h_C[%d].\n", i, i);
+			std::cout << "Error! h_result["<< i << "] != h_C[" << i << "]." << std::endl;
+			std::cout << int2bin(h_result[i]) << " " << int2bin(h_C[i]) << std::endl;
 			success = false;
 			break;
 		}
 
 	if (success)
-		printf("Test passed.\n");
+		std::cout << "Test passed" << std::endl;
 	else
-		printf("Error!\n");
+		std::cout << "Error!" << std::endl;
 
 	cudaFree((void *)d_A);
 	cudaFree((void *)d_B);
 	cudaFree((void *)d_C);
-		
-	free((void *)h_A);
-	free((void *)h_B);
-	free((void *)h_C);
+	cudaFree((void *)d_B_tr);
+
+	delete[] h_A;
+	delete[] h_B;
+	delete[] h_C;
+	delete[] h_B_tr;
+	delete[] h_result;
 
 	return 0;
 }
