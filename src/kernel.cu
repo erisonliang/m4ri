@@ -1,28 +1,11 @@
 #include <stdint.h>
 #include <ctime>
 #include <algorithm>
-#include <memory>
 #include <iostream>
 #include <cstdlib>
 #include <climits>
-#include <cstdio>
 
 #define UINT32_BIT_SIZE 32
-
-char* int2bin(uint32_t i)
-{
-	size_t bits = sizeof(uint32_t) * CHAR_BIT;
-
-    char* str = (char *)malloc(bits + 1);
-    if(!str) return NULL;
-    str[bits] = 0;
-
-    unsigned u = *(unsigned *)&i;
-	for(; bits--; u >>= 1)
-        str[bits] = u & 1 ? '1' : '0';
-
-    return str;
-}
 
 __device__ 
 bool inline d_get_bit(const uint32_t* arr, const uint32_t n)
