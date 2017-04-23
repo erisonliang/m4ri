@@ -5,10 +5,10 @@ cmake_minimum_required(VERSION 2.8)
 find_package(CUDA QUIET REQUIRED)
 
 #Set sourses and binaries directory
-set(SRC_LIST src/kernel.cu)
+set(SRC_LIST src/main.cu)
 
 #Compile with c++11 possibilities
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wno-deprecated-gpu-targets")
 set(EXECUTABLE_OUTPUT_PATH "../bin/")
 
 # Specify binary name and source file to build it from
