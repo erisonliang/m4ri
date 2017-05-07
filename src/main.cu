@@ -1,106 +1,60 @@
-#include <stdint.h>
-#include <ctime>
-#include <algorithm>
-#include <iostream>
-#include <cstdlib>
-#include <climits>
-#include <bitset>
-#include "include/kernel.cu"
+#include <cstdint>				// uint32_t
+#include <iostream>				// std::cout, std::endl
+#include <vector>				// std::vector
+#include <iomanip>				// std::setw
+#include <string>				// std::to_string
+#include <functional>			// std::plus
+#include <numeric>				// std::accumulate
+
+#include <benchmarks_x86.h>
+#include <benchmarks_x64.h>
+
+void print_bench(const std::string& title, 
+				 const std::vector<unsigned int>& arr_sizes, 
+				 const std::vector<std::vector<long long>>& bench)
+{
+	std::cout << title << std::endl;
+	std::cout << std::setw(10) << "SIZE" << std::setw(10) << "PREP_DUR" << std::setw(10) << "MULT_DUR" 
+		<< std::setw(11) << "TRANSF_DUR" << std::setw(10) << "TOTAL" << std::endl;
+	for(unsigned int i = 0; i < arr_sizes.size(); i++)
+	{
+		std::cout << std::setw(10) << (std::to_string(arr_sizes[i]) + "x" + std::to_string(arr_sizes[i]));
+		std::cout << std::setw(10) << (std::to_string(bench[i][0]) + "ms");
+		std::cout << std::setw(10) << (std::to_string(bench[i][1]) + "ms");
+		std::cout << std::setw(10) << (std::to_string(bench[i][2]) + "ms");
+		std::cout << std::setw(10) << (std::to_string(std::accumulate(bench[i].begin(), bench[i].end(), 
+			0, std::plus<long long>())) + "ms") << std::endl;
+	}
+	std::cout << std::endl;
+}
 
 int main() 
 {
-	const uint32_t a_rows = 256, a_cols = 256;
-	const uint32_t b_rows = 256, b_cols = 256;
+	const std::vector<unsigned int> arr_sizes{64, 128, 256, 512, 1024};
 
-	uint32_t* h_A 		= new uint32_t[a_rows * a_cols / 4];
-	uint32_t* h_B 		= new uint32_t[b_rows * b_cols / 4];
-	uint32_t* h_B_tr 	= new uint32_t[b_rows * b_cols / 4];
-	uint32_t* h_C 		= new uint32_t[a_rows * b_cols / 4];
-	uint32_t* h_result 	= new uint32_t[a_rows * b_cols / 4];
+	auto simple_cpu_bench_results_x86 = x86::simple_cpu_benchmark(arr_sizes);
+	print_bench("(x86)Simple CPU matrix multiplication:", arr_sizes, simple_cpu_bench_results_x86);
 
-	for (uint32_t i = 0; i < a_rows; i++)
-		for (uint32_t j = 0; j < a_cols / UINT32_BIT_SIZE; j++)
-			h_A[i * a_cols / UINT32_BIT_SIZE + j] = (uint32_t)rand();
+	auto simple_cpu_bench_results_x64 = x64::simple_cpu_benchmark(arr_sizes);
+	print_bench("(x64)Simple CPU matrix multiplication:", arr_sizes, simple_cpu_bench_results_x64);
 
-	for (uint32_t i = 0; i < b_rows; i++)
-		for (uint32_t j = 0; j < b_cols / UINT32_BIT_SIZE; j++)
-			h_B[i * b_cols / UINT32_BIT_SIZE + j] = (uint32_t)rand();
+	auto m4ri_cpu_bench_results_x86 = x86::m4ri_cpu_benchmark(arr_sizes);
+	print_bench("(x86)M4RI CPU matrix multiplication:", arr_sizes, m4ri_cpu_bench_results_x86);
 
-	uint32_t *d_A = nullptr, *d_B = nullptr, *d_B_tr = nullptr, *d_C = nullptr;
+	auto m4ri_cpu_bench_results_x64 = x64::m4ri_cpu_benchmark(arr_sizes);
+	print_bench("(x64)M4RI CPU matrix multiplication:", arr_sizes, m4ri_cpu_bench_results_x64);
 
-	cudaMalloc((void **)&d_A, a_rows * a_cols);
-	cudaMalloc((void **)&d_B, b_rows * b_cols);
-	cudaMalloc((void **)&d_B_tr, b_rows * b_cols);
-	cudaMalloc((void **)&d_C, a_rows * b_cols);
+	auto m4ri_gpu_bench_results_x86 = x86::m4ri_gpu_benchmark(arr_sizes);
+	print_bench("(x86)M4RI GPU matrix multiplication:", arr_sizes, m4ri_gpu_bench_results_x86);
 
-	cudaMemcpy((void *)d_A, (const void*)h_A, a_rows * a_cols, cudaMemcpyHostToDevice);
-	cudaMemcpy((void *)d_B, (const void*)h_B, b_rows * b_cols, cudaMemcpyHostToDevice);
+	auto m4ri_gpu_bench_resylts_x64 = x64::m4ri_gpu_benchmark(arr_sizes);
+	print_bench("(x64)M4RI GPU matrix multiplication:", arr_sizes, m4ri_gpu_bench_resylts_x64);
 
-	dim3 block_size(std::min(int(a_rows), 512));
-	dim3 grid_size(a_rows / block_size.x);
+	auto mar_gpu_bench_results_x86 = x86::mar_gpu_benchmark(arr_sizes);
+	print_bench("(x86)MAR GPU matrix multiplication:", arr_sizes, mar_gpu_bench_results_x86);
 
-	bool* d_precalc = nullptr;
-	int precalc_size = cpu_log2(a_rows);
-	cudaMalloc((void **)&d_precalc, (1 << precalc_size) * (1 << precalc_size));
-	
-
-	float gpu_time = 0;
-	cudaEvent_t timer_start, timer_stop;
-	cudaEventCreate(&timer_start); cudaEventCreate(&timer_stop);
-	cudaEventRecord(timer_start, 0);
-
-	gpu_transpose <<< 1, 1 >>> (d_B_tr, d_B, b_rows, b_cols);
-
-	precalc<<<1, 1>>>(d_precalc, precalc_size);
-
-	gpu_multiplication <<< grid_size, block_size >>> (d_A, a_rows, a_cols, d_B_tr, b_cols, b_rows, d_C, d_precalc);
-	
-	cudaEventRecord(timer_stop);
-	cudaEventSynchronize(timer_stop);
-	cudaEventElapsedTime(&gpu_time, timer_start, timer_stop);
-
-	cudaError_t error = cudaGetLastError();
-	if (error != cudaSuccess)
-	{
-		std::cout << cudaGetErrorString(error) << std::endl;
-		return 1;
-	}
-
-	float cpu_time = clock();
-	cpu_multiplication(h_A, a_rows, a_cols, h_B, b_rows, b_cols, h_C);
-	cpu_time = clock() - cpu_time;
-	
-	std::cout << "GPU elapsed time: " << gpu_time << " ms" << std::endl;
-	std::cout << "CPU elapsed time: " << cpu_time <<" ms" << std::endl;
-
-	cudaMemcpy((void **)h_result, (const void**)d_C, a_rows * b_cols, cudaMemcpyDeviceToHost);
-
-	bool success = true;
-	for (uint32_t i = 0; i < a_rows * b_cols / UINT32_BIT_SIZE; i++)
-		if (h_result[i] != h_C[i])
-		{
-			std::cout << "Error! h_result["<< i << "] != h_C[" << i << "]." << std::endl;
-			std::cout << std::bitset<32>(h_result[i]) << " != " << std::bitset<32>(h_C[i]) << std::endl;
-			success = false;
-			break;
-		}
-
-	if (success)
-		std::cout << "Test passed" << std::endl;
-	else
-		std::cout << "Error!" << std::endl;
-
-	cudaFree((void *)d_A);
-	cudaFree((void *)d_B);
-	cudaFree((void *)d_C);
-	cudaFree((void *)d_B_tr);
-	cudaFree((void *)d_precalc);
-
-	delete[] h_A;
-	delete[] h_B;
-	delete[] h_C;
-	delete[] h_B_tr;
-	delete[] h_result;
+	auto mar_gpu_bench_results_x64 = x64::mar_gpu_benchmark(arr_sizes);
+	print_bench("(x64)MAR GPU matrix multiplication:", arr_sizes, mar_gpu_bench_results_x64);
 
 	return 0;
 }
