@@ -10,7 +10,9 @@ set(SRC_LIST src/main.cu)
 include_directories(src/x86, src/x64)
 
 #Compile with c++11 possibilities
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wno-deprecated-gpu-targets")
+set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CUDA_NVCC_FLAGS "-O3 -Wno-deprecated-gpu-targets")
+
 set(EXECUTABLE_OUTPUT_PATH "../bin/")
 
 # Specify binary name and source file to build it from

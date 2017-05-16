@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>				// std::vector
 #include <cstdint>				// uint64_t
 #include <chrono>				// std::chrono::steady_clock
@@ -28,32 +30,29 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-				uint64_t* A 			= new uint64_t[(*size) * (*size) / 4];
-				uint64_t* B 			= new uint64_t[(*size) * (*size) / 4];
-				uint64_t* cpu_result 	= new uint64_t[(*size) * (*size) / 4];
+			uint64_t* A 		 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B 		 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* cpu_result = (uint64_t *)malloc((*size) * (*size) / 8);
 
-				for (uint64_t i = 0; i < *size; i++)
-					for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-						A[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				A[i] = (uint64_t)rand();
 
-				for (uint64_t i = 0; i < *size; i++)
-					for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-						B[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for (uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				B[i] = (uint64_t)rand();
 
-				auto cpu_time_begin = std::chrono::steady_clock::now();
-				cpu::multiply(A, *size, *size, B, *size, *size, cpu_result);
-				auto cpu_time_end = std::chrono::steady_clock::now();
-				long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(cpu_time_end - cpu_time_begin).count();
+			auto cpu_time_begin = std::chrono::steady_clock::now();
+			cpu::multiply(A, *size, *size, B, *size, *size, cpu_result);
+			auto cpu_time_end = std::chrono::steady_clock::now();
+			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(cpu_time_end - cpu_time_begin).count();
 
-				bench_results.push_back({0, mult_time, 0});
+			bench_results.push_back({0, mult_time, 0});
 
-				delete[] A;
-				delete[] B;
-				delete[] cpu_result;
+			free(A);
+			free(B);
+			free(cpu_result);
 		}
 
 		return bench_results;
-
 	}
 
 	std::vector<std::vector<long long>> 
@@ -63,40 +62,38 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-				unsigned int k = log2(*size);
+			unsigned int k = 8;
 
-				uint64_t* A 			= new uint64_t[(*size) * (*size) / 4];
-				uint64_t* B 			= new uint64_t[(*size) * (*size) / 4];
-				uint64_t* B_tr 			= new uint64_t[(*size) * (*size) / 4];
-				uint64_t* cpu_result 	= new uint64_t[(*size) * (*size) / 4];
-				bool* precalc_matrix 	= new bool[(1 << k) * (1 << k)];
+			uint64_t* A 			 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B 			 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B_tr 			 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* cpu_result 	 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* precalc_matrix = (uint64_t *)malloc((1 << k) * (1 << k) / 8);
 
-				for (uint64_t i = 0; i < *size; i++)
-					for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-						A[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				A[i] = (uint64_t)rand();
 
-				for (uint64_t i = 0; i < *size; i++)
-					for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-						B[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for (uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				B[i] = (uint64_t)rand();
 
-				auto prep_begin = std::chrono::steady_clock::now();
-				cpu::transpose(B_tr, B, *size, *size);
-				cpu::m4ri_precalc(precalc_matrix, k);
-				auto prep_end = std::chrono::steady_clock::now();
-				long long prep_time = std::chrono::duration_cast<std::chrono::milliseconds>(prep_end - prep_begin).count();
+			auto prep_begin = std::chrono::steady_clock::now();
+			cpu::transpose(B_tr, B, *size, *size);
+			cpu::m4ri_precalc(precalc_matrix, k);
+			auto prep_end = std::chrono::steady_clock::now();
+			long long prep_time = std::chrono::duration_cast<std::chrono::milliseconds>(prep_end - prep_begin).count();
 
-				auto cpu_time_begin = std::chrono::steady_clock::now();
-				cpu::m4ri_multiply(A, *size, *size, B_tr, *size, *size, cpu_result, precalc_matrix, k);
-				auto cpu_time_end = std::chrono::steady_clock::now();
-				long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(cpu_time_end - cpu_time_begin).count();
+			auto cpu_time_begin = std::chrono::steady_clock::now();
+			cpu::m4ri_multiply(A, *size, *size, B_tr, *size, *size, cpu_result, precalc_matrix, k);
+			auto cpu_time_end = std::chrono::steady_clock::now();
+			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(cpu_time_end - cpu_time_begin).count();
 
-				bench_results.push_back({prep_time, mult_time, 0});
+			bench_results.push_back({prep_time, mult_time, 0});
 				
-				delete[] A;
-				delete[] B;
-				delete[] B_tr;
-				delete[] cpu_result;
-				delete[] precalc_matrix;
+			free(A);
+			free(B);
+			free(B_tr);
+			free(cpu_result);
+			free(precalc_matrix);
 		}
 
 		return bench_results;
@@ -109,35 +106,33 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-			uint64_t* A 			= new uint64_t[(*size) * (*size) / 4];
-			uint64_t* B 			= new uint64_t[(*size) * (*size) / 4];
-			uint64_t* gpu_result 	= new uint64_t[(*size) * (*size) / 4];
+			unsigned int k = 8;
 
-			unsigned int k = log2(*size);
+			uint64_t* A 			= (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B 			= (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* gpu_result 	= (uint64_t *)malloc((*size) * (*size) / 8);
 
-			for (uint64_t i = 0; i < *size; i++)
-				for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-					A[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				A[i] = (uint64_t)rand();
 
-			for (uint64_t i = 0; i < *size; i++)
-				for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-					B[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for (uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				B[i] = (uint64_t)rand();
 
-			uint64_t *d_A = nullptr; 
-			uint64_t *d_B = nullptr; 
+			uint64_t *d_A 	 = nullptr; 
+			uint64_t *d_B 	 = nullptr; 
 			uint64_t *d_B_tr = nullptr;
-			uint64_t *d_C = nullptr;
-			bool* d_precalc = nullptr;
+			uint64_t *d_C 	 = nullptr;
+			uint64_t* d_precalc  = nullptr;
 
-			cudaMalloc((void **)&d_A, (*size) * (*size));
-			cudaMalloc((void **)&d_B, (*size) * (*size));
-			cudaMalloc((void **)&d_B_tr, (*size) * (*size));
-			cudaMalloc((void **)&d_C, (*size) * (*size));
-			cudaMalloc((void **)&d_precalc, (1 << k) * (1 << k));
+			cudaMalloc((void **)&d_A, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B_tr, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_C, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_precalc, (1 << k) * (1 << k) / 8);
 
 			auto transfer_hd_begin = std::chrono::steady_clock::now();
-			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size), cudaMemcpyHostToDevice);
-			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size), cudaMemcpyHostToDevice);
+			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
+			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 			auto transfer_hd_end = std::chrono::steady_clock::now();
 
 			dim3 block_size(std::min(int(*size), 512));
@@ -150,7 +145,6 @@ namespace x64
 			auto prep_end = std::chrono::steady_clock::now();
 			long long prep_time = std::chrono::duration_cast<std::chrono::milliseconds>(prep_end - prep_begin).count();
 
-
 			auto gpu_mult_begin = std::chrono::steady_clock::now();
 			gpu::m4ri_multiply <<< grid_size, block_size >>> (d_A, *size, *size, d_B_tr, *size, *size, d_C, d_precalc, k);
 			cudaDeviceSynchronize();
@@ -158,7 +152,7 @@ namespace x64
 			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(gpu_mult_end - gpu_mult_begin).count();
 
 			auto transfer_dh_begin = std::chrono::steady_clock::now();
-			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size), cudaMemcpyDeviceToHost);
+			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size) / 8, cudaMemcpyDeviceToHost);
 			auto transfer_dh_end = std::chrono::steady_clock::now();
 			long long transfer_time = std::chrono::duration_cast<std::chrono::milliseconds>(
 				transfer_hd_end - transfer_hd_begin + transfer_dh_end - transfer_dh_begin).count();
@@ -170,6 +164,10 @@ namespace x64
 			cudaFree((void *)d_C);
 			cudaFree((void *)d_B_tr);
 			cudaFree((void *)d_precalc);
+
+			free(A);
+			free(B);
+			free(gpu_result);
 		}
 
 		return bench_results;
@@ -182,32 +180,29 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-			uint64_t* A 			= new uint64_t[(*size) * (*size) / 4];
-			uint64_t* B 			= new uint64_t[(*size) * (*size) / 4];
-			uint64_t* C 			= new uint64_t[(*size) * (*size) / 4];
-			uint64_t* gpu_result	= new uint64_t[(*size) * (*size) / 4];
+			uint64_t* A 			= (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B 			= (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* gpu_result	= (uint64_t *)malloc((*size) * (*size) / 8);
 
-			for (uint64_t i = 0; i < *size; i++)
-				for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-					A[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				A[i] = (uint64_t)rand();
 
-			for (uint64_t i = 0; i < *size; i++)
-				for (uint64_t j = 0; j < *size / UINT64_BIT_SIZE; j++)
-					B[i * (*size) / UINT64_BIT_SIZE + j] = (uint64_t)rand();
+			for (uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+				B[i] = (uint64_t)rand();
 
 			uint64_t *d_A 		= nullptr; 
 			uint64_t *d_B 		= nullptr; 
 			uint64_t *d_C 		= nullptr;
 
-			cudaMalloc((void **)&d_A, (*size) * (*size));
-			cudaMalloc((void **)&d_B, (*size) * (*size));
-			cudaMalloc((void **)&d_C, (*size) * (*size));
+			cudaMalloc((void **)&d_A, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_C, (*size) * (*size) / 8);
 
-			cudaMemset(d_C, 0, (*size) * (*size));
+			cudaMemset(d_C, 0, (*size) * (*size) / 8);
 
 			auto transfer_hd_begin = std::chrono::steady_clock::now();
-			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size), cudaMemcpyHostToDevice);
-			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size), cudaMemcpyHostToDevice);
+			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
+			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 			auto transfer_hd_end = std::chrono::steady_clock::now();
 
 			dim3 block_size(std::min(int(*size), 512));
@@ -220,7 +215,7 @@ namespace x64
 			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(mult_end - mult_begin).count();
 
 			auto transfer_dh_begin = std::chrono::steady_clock::now();
-			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size), cudaMemcpyDeviceToHost);
+			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size) / 8, cudaMemcpyDeviceToHost);
 			auto transfer_dh_end = std::chrono::steady_clock::now();
 			long long transfer_time = std::chrono::duration_cast<std::chrono::milliseconds>(
 				transfer_hd_end - transfer_hd_begin + transfer_dh_end - transfer_dh_begin).count();
@@ -231,13 +226,99 @@ namespace x64
 			cudaFree((void *)d_B);
 			cudaFree((void *)d_C);
 
-			delete[] gpu_result;
-			delete[] C;
-			delete[] B;
-			delete[] A;
+			free(gpu_result);
+			free(B);
+			free(A);
 		}
 
 		return bench_results;
 	}
 
-}
+	std::vector<std::vector<long long>>
+	m4ri_opt_gpu_benchmark(const std::vector<unsigned int>& arr_sizes)
+	{
+		std::vector<std::vector<long long>> bench_results;
+
+		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
+		{
+			uint64_t* A 		 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* B 		 = (uint64_t *)malloc((*size) * (*size) / 8);
+			uint64_t* gpu_result = (uint64_t *)malloc((*size) * (*size) / 8);
+
+			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+					A[i] = (uint64_t)rand();
+
+			for (uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
+					B[i] = (uint64_t)rand();
+
+			uint64_t *d_A = nullptr; 
+			uint64_t *d_B = nullptr; 
+			uint64_t *d_C = nullptr;
+
+			cudaMalloc((void **)&d_A, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B, (*size) * (*size) / 8);
+			cudaMalloc((void **)&d_C, (*size) * (*size) / 8);
+
+			cudaMemset(d_C, 0, (*size) * (*size) / 8);
+
+			auto transfer_hd_begin = std::chrono::steady_clock::now();
+			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
+			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
+			auto transfer_hd_end = std::chrono::steady_clock::now();
+
+			std::vector<cudaStream_t> cuda_streams(*size / 128);
+			for(unsigned int i = 0; i < *size / 128; i++)
+			{
+				cudaStreamCreate(&cuda_streams[i]);
+			}
+
+			std::vector<uint64_t*> precalc_tables(*size / 128);
+			for(unsigned int i = 0; i < *size / 128; i++)
+			{
+				cudaMalloc((void **)&precalc_tables[i], (*size) * 8 * sizeof(uint64_t));
+			}
+
+			auto mult_begin = std::chrono::steady_clock::now();
+			for(unsigned int i = 0; i < *size / 128; i++)
+			{
+				// всего таблиц для 1 блока-столбца - 32 * (size / 128), общий размер 32 * size / 128 * 16 * 4 
+				dim3 block_size(std::min(int(*size / 4), 512));
+				dim3 grid_size((*size) / block_size.x);	
+				gpu::m4ri_opt_precalc <<<grid_size, block_size, 0, cuda_streams[i]>>> (d_B, *size, precalc_tables[i], i);
+
+				block_size = dim3(std::min(int(*size), 512));
+				grid_size = dim3((*size) / block_size.x);	
+				gpu::m4ri_opt_multiply <<<grid_size, block_size, 0, cuda_streams[i]>>> 
+					(d_A, *size, *size, d_B, *size, *size, d_C, precalc_tables[i], i);
+			}
+			cudaDeviceSynchronize();
+
+			auto mult_end = std::chrono::steady_clock::now();
+			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(mult_end - mult_begin).count();
+
+			auto transfer_dh_begin = std::chrono::steady_clock::now();
+			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size) / 8, cudaMemcpyDeviceToHost);
+			auto transfer_dh_end = std::chrono::steady_clock::now();
+			long long transfer_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+				transfer_hd_end - transfer_hd_begin + transfer_dh_end - transfer_dh_begin).count();
+
+			bench_results.push_back({0, mult_time, transfer_time});
+
+			for(unsigned int i = 0; i < *size / 128; i++)
+				cudaStreamDestroy(cuda_streams[i]);
+
+			for(unsigned int i = 0; i < *size / 128; i++)
+				cudaFree((void *)precalc_tables[i]);
+			cudaFree((void *)d_A);
+			cudaFree((void *)d_B);
+			cudaFree((void *)d_C);
+
+			free(gpu_result);
+			free(B);
+			free(A);
+		}
+
+		return bench_results;
+	}
+
+}	// namespace x64
