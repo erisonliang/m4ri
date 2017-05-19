@@ -9,9 +9,6 @@
 
 namespace x64
 {
-
-	#define UINT64_BIT_SIZE 64
-
 	int log2(uint64_t a)
 	{
 		int value = 1;
@@ -62,13 +59,11 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-			unsigned int k = 8;
-
 			uint64_t* A 			 = (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* B 			 = (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* B_tr 			 = (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* cpu_result 	 = (uint64_t *)malloc((*size) * (*size) / 8);
-			uint64_t* precalc_matrix = (uint64_t *)malloc((1 << k) * (1 << k) / 8);
+			uint64_t* precalc_matrix = (uint64_t *)malloc(cpu::M4RI_PRECALC_SIZE / 8);
 
 			for(uint64_t i = 0; i < (*size) * (*size) / UINT64_BIT_SIZE; i++)
 				A[i] = (uint64_t)rand();
@@ -78,12 +73,12 @@ namespace x64
 
 			auto prep_begin = std::chrono::steady_clock::now();
 			cpu::transpose(B_tr, B, *size, *size);
-			cpu::m4ri_precalc(precalc_matrix, k);
+			cpu::m4ri_precalc(precalc_matrix, cpu::SUBVECTOR_SIZE);
 			auto prep_end = std::chrono::steady_clock::now();
 			long long prep_time = std::chrono::duration_cast<std::chrono::milliseconds>(prep_end - prep_begin).count();
 
 			auto cpu_time_begin = std::chrono::steady_clock::now();
-			cpu::m4ri_multiply(A, *size, *size, B_tr, *size, *size, cpu_result, precalc_matrix, k);
+			cpu::m4ri_multiply(A, *size, *size, B_tr, *size, *size, cpu_result, precalc_matrix, cpu::SUBVECTOR_SIZE);
 			auto cpu_time_end = std::chrono::steady_clock::now();
 			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(cpu_time_end - cpu_time_begin).count();
 
@@ -106,8 +101,6 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-			unsigned int k = 8;
-
 			uint64_t* A 			= (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* B 			= (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* gpu_result 	= (uint64_t *)malloc((*size) * (*size) / 8);
@@ -124,29 +117,32 @@ namespace x64
 			uint64_t *d_C 	 = nullptr;
 			uint64_t* d_precalc  = nullptr;
 
-			cudaMalloc((void **)&d_A, (*size) * (*size) / 8);
-			cudaMalloc((void **)&d_B, (*size) * (*size) / 8);
-			cudaMalloc((void **)&d_B_tr, (*size) * (*size) / 8);
-			cudaMalloc((void **)&d_C, (*size) * (*size) / 8);
-			cudaMalloc((void **)&d_precalc, (1 << k) * (1 << k) / 8);
+			cudaMalloc((void **)&d_A, 		(*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B, 		(*size) * (*size) / 8);
+			cudaMalloc((void **)&d_B_tr, 	(*size) * (*size) / 8);
+			cudaMalloc((void **)&d_C, 		(*size) * (*size) / 8);
+			cudaMalloc((void **)&d_precalc, gpu::M4RI_PRECALC_SIZE / 8);
 
 			auto transfer_hd_begin = std::chrono::steady_clock::now();
 			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 			auto transfer_hd_end = std::chrono::steady_clock::now();
 
-			dim3 block_size(std::min(int(*size), 512));
-			dim3 grid_size(*size / block_size.x);
-
+			dim3 block_size(std::min(int(1 << gpu::SUBVECTOR_SIZE), 512));
+			dim3 grid_size((1 << gpu::SUBVECTOR_SIZE) / block_size.x);
 			auto prep_begin = std::chrono::steady_clock::now();
-			gpu::transpose <<< 1, 1 >>> (d_B_tr, d_B, *size, *size);
-			gpu::m4ri_precalc <<<1, 1>>> (d_precalc, k);
+			gpu::m4ri_precalc <<< grid_size, block_size >>> (d_precalc, gpu::SUBVECTOR_SIZE);
+
+			block_size = dim3(std::min(int(*size), 512));
+			grid_size  = dim3(*size / block_size.x);
+			gpu::transpose <<< grid_size, block_size >>> (d_B_tr, d_B, *size, *size);
 			cudaDeviceSynchronize();
 			auto prep_end = std::chrono::steady_clock::now();
 			long long prep_time = std::chrono::duration_cast<std::chrono::milliseconds>(prep_end - prep_begin).count();
 
 			auto gpu_mult_begin = std::chrono::steady_clock::now();
-			gpu::m4ri_multiply <<< grid_size, block_size >>> (d_A, *size, *size, d_B_tr, *size, *size, d_C, d_precalc, k);
+			gpu::m4ri_multiply <<< grid_size, block_size >>> 
+				(d_A, *size, *size, d_B_tr, *size, *size, d_C, d_precalc, gpu::SUBVECTOR_SIZE);
 			cudaDeviceSynchronize();
 			auto gpu_mult_end = std::chrono::steady_clock::now();
 			long long mult_time = std::chrono::duration_cast<std::chrono::milliseconds>(gpu_mult_end - gpu_mult_begin).count();

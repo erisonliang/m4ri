@@ -2,11 +2,14 @@
 
 #include <stdint.h>
 
+#define UINT64_BIT_SIZE 64
+
 namespace x64
 {
 	namespace gpu 
 	{
-		#define UINT64_BIT_SIZE 64
+		const unsigned int SUBVECTOR_SIZE 	 = 8;
+		const unsigned int M4RI_PRECALC_SIZE = (1 << SUBVECTOR_SIZE) * (1 << SUBVECTOR_SIZE);
 
 		__device__ 
 		bool inline get_bit(const uint64_t* arr, uint64_t n)
@@ -34,6 +37,15 @@ namespace x64
 		{
 			// index - номер строки в матрице А и В
 			const unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+			const unsigned int size = M4RI_PRECALC_SIZE / UINT64_BIT_SIZE;
+			
+			__shared__ uint64_t precalc_sh[size];
+			
+			const unsigned int elems_per_thread = size / blockDim.x;
+			for(unsigned int i = 0; i < elems_per_thread; i++)
+				precalc_sh[threadIdx.x * elems_per_thread + i] = precalc_matrix[threadIdx.x * elems_per_thread + i];  
+
+			__syncthreads();
 
 			for (unsigned int i = 0; i < b_rows; i++)											 
 			{
@@ -50,7 +62,7 @@ namespace x64
 					uint64_t k_vector_A = (A[id_A] >> offset) & ((1 << k) - 1);
 					uint64_t k_vector_B = (B[id_B] >> offset) & ((1 << k) - 1);
 
-					sum ^= get_bit(precalc_matrix, k_vector_A * (1 << k) + k_vector_B);
+					sum ^= get_bit(precalc_sh, k_vector_A * (1 << k) + k_vector_B);
 				}
 				set_bit(C, index * b_rows + i, sum);
 			}
@@ -59,26 +71,26 @@ namespace x64
 		__global__
 		void transpose(uint64_t* dst, const uint64_t* src, uint64_t rows, uint64_t cols)
 		{
-			for(unsigned int i = 0; i < rows; ++i)
-				for (unsigned int j = 0; j < cols; ++j)
-					set_bit(dst, i * cols + j, get_bit(src, j * rows + i));
+			const unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+
+			for (unsigned int j = 0; j < cols; ++j)
+				set_bit(dst, index * cols + j, get_bit(src, j * rows + index));
 		}
 
 
 		__global__
 		void m4ri_precalc(uint64_t* precalc_matrix, uint64_t bits)
 		{
-			for(uint64_t i = 0; i < (1 << bits); i++)
+			const uint64_t index = threadIdx.x + blockIdx.x * blockDim.x;
+
+			for(uint64_t j = 0; j < (1 << bits); j++)
 			{
-				for(uint64_t j = 0; j < (1 << bits); j++)
+				uint64_t scalar_product = 0;
+				for(uint64_t k = 0; k < bits; k++)
 				{
-					uint64_t scalar_product = 0;
-					for(uint64_t k = 0; k < bits; k++)
-					{
-						scalar_product ^= get_bit(&i, k) & get_bit(&j, k);
-					}
-					set_bit(precalc_matrix, i * (1 << bits) + j, scalar_product);
+					scalar_product ^= get_bit(&index, k) & get_bit(&j, k);
 				}
+				set_bit(precalc_matrix, index * (1 << bits) + j, scalar_product);
 			}
 		}
 

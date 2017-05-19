@@ -61,7 +61,7 @@ int main()
 	const std::vector<unsigned int> arr_sizes{64, 128, 256, 512, 1024};
 
 	bool success;
-
+	
 	// Каноничные версии алгоритмов - не тестируются
 	auto simple_cpu_bench_results_x86 = x86::simple_cpu_benchmark(arr_sizes);
 	print_bench("BENCH (x86)Simple CPU matrix multiplication:", arr_sizes, simple_cpu_bench_results_x86);
@@ -92,7 +92,7 @@ int main()
 	std::cout << std::endl;
 	
 	//!-----------------------------------------------------------------------------------------------------
-
+	
 	auto m4ri_gpu_test_results_x86 = x86::m4ri_gpu_test(arr_sizes);
 	success = print_test("TEST (x86)M4RI GPU matrix multiplication:", arr_sizes, m4ri_gpu_test_results_x86);
 	if(success)
@@ -112,7 +112,7 @@ int main()
 	std::cout << std::endl;
 	
 	//!-----------------------------------------------------------------------------------------------------
-
+	
 	auto mar_gpu_test_results_x86 = x86::mar_gpu_test(arr_sizes);
 	success = print_test("TEST (x86)MAR GPU matrix multiplication:", arr_sizes, mar_gpu_test_results_x86);
 	if(success)
@@ -152,6 +152,6 @@ int main()
 	std::cout << std::endl;
 
 	//!-----------------------------------------------------------------------------------------------------
-
+	
 	return 0;
 }

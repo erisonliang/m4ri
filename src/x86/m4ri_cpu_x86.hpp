@@ -2,12 +2,15 @@
 
 #include <cstdint>
 
+#define UINT32_BIT_SIZE 32
+
 namespace x86
 {
 	namespace cpu
 	{
-		#define UINT32_BIT_SIZE 32
-
+		const unsigned int SUBVECTOR_SIZE 	 = 8;
+		const unsigned int M4RI_PRECALC_SIZE = (1 << SUBVECTOR_SIZE) * (1 << SUBVECTOR_SIZE);
+		
 		bool inline get_bit(const uint32_t* arr, uint32_t n)
 		{
 			uint32_t cell_idx = n / UINT32_BIT_SIZE;

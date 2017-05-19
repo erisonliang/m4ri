@@ -2,11 +2,14 @@
 
 #include <cstdint>
 
+#define UINT64_BIT_SIZE 64
+
 namespace x64
 {
 	namespace cpu 
 	{
-		#define UINT64_BIT_SIZE 64
+		const unsigned int SUBVECTOR_SIZE 	 = 8;
+		const unsigned int M4RI_PRECALC_SIZE = (1 << SUBVECTOR_SIZE) * (1 << SUBVECTOR_SIZE);
 
 		bool inline get_bit(const uint64_t* arr, uint64_t n)
 		{
@@ -91,5 +94,5 @@ namespace x64
 				}
 			}
 		}
-	}
-}
+	}	// namespace cpu
+}	// namespace x86

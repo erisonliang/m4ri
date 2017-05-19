@@ -1,12 +1,16 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h>
+
+#define UINT32_BIT_SIZE 32
 
 namespace x86 
 {
 	namespace gpu
 	{
-		#define UINT32_BIT_SIZE 32
+		const unsigned int SUBVECTOR_SIZE 	 = 8;
+		const unsigned int M4RI_PRECALC_SIZE = (1 << SUBVECTOR_SIZE) * (1 << SUBVECTOR_SIZE);
 
 		__device__ 
 		uint32_t inline get_bit(const uint32_t* arr, uint32_t n)
@@ -34,10 +38,19 @@ namespace x86
 		{
 			// index - номер строки в матрице А и В
 			const unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+			const unsigned int size = M4RI_PRECALC_SIZE / UINT32_BIT_SIZE;
+
+			__shared__ uint32_t precalc_sh[size];
+			
+			const unsigned int elems_per_thread = size / blockDim.x;
+			for(unsigned int i = 0; i < elems_per_thread; i++)
+				precalc_sh[threadIdx.x * elems_per_thread + i] = precalc_matrix[threadIdx.x * elems_per_thread + i];  
+
+			__syncthreads();
 
 			for (unsigned int i = 0; i < b_rows; i++)											 
 			{
-				uint32_t sum = 0;
+				uint32_t sum = 0;;
 				for(unsigned int j = 0; j < b_cols / k; j++)
 				{
 					// получаем нужный uint32_t элемент в массиве A и B
@@ -50,7 +63,7 @@ namespace x86
 					uint32_t k_vector_A = (A[id_A] >> offset) & ((1 << k) - 1);
 					uint32_t k_vector_B = (B[id_B] >> offset) & ((1 << k) - 1);
 
-					sum ^= get_bit(precalc_matrix, k_vector_A * (1 << k) + k_vector_B);
+					sum ^= get_bit(precalc_sh, k_vector_A * (1 << k) + k_vector_B);
 				}
 				set_bit(C, index * b_rows + i, sum);
 			}
@@ -59,25 +72,25 @@ namespace x86
 		__global__
 		void transpose(uint32_t* dst, const uint32_t* src, unsigned int rows, unsigned int cols)
 		{
-			for(unsigned int i = 0; i < rows; ++i)
-				for (unsigned int j = 0; j < cols; ++j)
-					set_bit(dst, i * cols + j, get_bit(src, j * rows + i));
+			const unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+
+			for (unsigned int j = 0; j < cols; ++j)
+				set_bit(dst, index * cols + j, get_bit(src, j * rows + index));
 		}
 
 		__global__
 		void m4ri_precalc(uint32_t* precalc_matrix, uint32_t bits)
 		{
-			for(uint32_t i = 0; i < (1 << bits); i++)
+			const unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+			
+			for(uint32_t j = 0; j < (1 << bits); j++)
 			{
-				for(uint32_t j = 0; j < (1 << bits); j++)
+				uint32_t scalar_product = 0;
+				for(uint32_t k = 0; k < bits; k++)
 				{
-					uint32_t scalar_product = 0;
-					for(uint32_t k = 0; k < bits; k++)
-					{
-						scalar_product ^= get_bit(&i, k) & get_bit(&j, k);
-					}
-					set_bit(precalc_matrix, i * (1 << bits) + j, scalar_product);
+					scalar_product ^= get_bit(&index, k) & get_bit(&j, k);
 				}
+				set_bit(precalc_matrix, index * (1 << bits) + j, scalar_product);
 			}
 		}
 

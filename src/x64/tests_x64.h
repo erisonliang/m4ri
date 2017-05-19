@@ -3,13 +3,13 @@
 #include <vector>				// std::vector
 #include <cstdint>				// uint64_t
 
+#include <iostream>
+
 #include "m4ri_cpu_x64.hpp"
 #include "m4ri_gpu_x64.cu"
 
 namespace x64
 {
-	#define UINT64_BIT_SIZE 64
-
 	std::vector<bool>
 	m4ri_cpu_test(const std::vector<unsigned int>& arr_sizes)
 	{
@@ -67,8 +67,6 @@ namespace x64
 
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
-			unsigned int k = 8;
-
 			uint64_t* A 			= (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* B 			= (uint64_t *)malloc((*size) * (*size) / 8);
 			uint64_t* gpu_result 	= (uint64_t *)malloc((*size) * (*size) / 8);
@@ -90,19 +88,21 @@ namespace x64
 			cudaMalloc((void **)&d_B, 		(*size) * (*size) / 8);
 			cudaMalloc((void **)&d_B_tr, 	(*size) * (*size) / 8);
 			cudaMalloc((void **)&d_C, 		(*size) * (*size) / 8);
-			cudaMalloc((void **)&d_precalc, (1 << k) * (1 << k) / 8);
+			cudaMalloc((void **)&d_precalc, gpu::M4RI_PRECALC_SIZE / 8);
 
 			cudaMemcpy((void *)d_A, (const void*)A, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 			cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 
-			dim3 block_size(std::min(int(*size), 512));
-			dim3 grid_size(*size / block_size.x);
-
-			gpu::transpose <<< 1, 1 >>> (d_B_tr, d_B, *size, *size);
-			gpu::m4ri_precalc <<<1, 1>>> (d_precalc, k);
-			gpu::m4ri_multiply <<< grid_size, block_size >>> (d_A, *size, *size, d_B_tr, *size, *size, d_C, d_precalc, k);
+			dim3 block_size(std::min(1 << gpu::SUBVECTOR_SIZE, 512));
+			dim3 grid_size((1 << gpu::SUBVECTOR_SIZE)/ block_size.x);
+			gpu::m4ri_precalc <<< grid_size, block_size >>> (d_precalc, gpu::SUBVECTOR_SIZE);
+			
+			block_size = dim3(std::min(int(*size), 512));
+			grid_size  = dim3(*size / block_size.x);
+			gpu::transpose <<< grid_size, block_size >>> (d_B_tr, d_B, *size, *size);
+			gpu::m4ri_multiply <<< grid_size, block_size >>> 
+				(d_A, *size, *size, d_B_tr, *size, *size, d_C, d_precalc, gpu::SUBVECTOR_SIZE);
 			cudaDeviceSynchronize();
-
 			cudaMemcpy((void **)gpu_result, (const void**)d_C, (*size) * (*size) / 8, cudaMemcpyDeviceToHost);
 
 			cpu::multiply(A, *size, *size, B, *size, *size, cpu_result);
