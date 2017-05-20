@@ -25,7 +25,7 @@ namespace x64
 	simple_cpu_benchmark(const std::vector<unsigned int>& arr_sizes, unsigned int times)
 	{
 		std::vector<std::vector<long long>> bench_results(arr_sizes.size(), std::vector<long long>(3));
-
+		unsigned int iter = 0;
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
 			std::vector<std::vector<long long>> durations(times, std::vector<long long>(3));
@@ -55,12 +55,14 @@ namespace x64
 
 			for(unsigned int i = 0; i < 3; i++)
 			{
-				bench_results[*size][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
+				bench_results[iter][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
 				);				
 			}
+
+			iter++;
 		}
 
 		return bench_results;
@@ -70,7 +72,7 @@ namespace x64
 	m4ri_cpu_benchmark(const std::vector<unsigned int>& arr_sizes, unsigned int times)
 	{
 		std::vector<std::vector<long long>> bench_results(arr_sizes.size(), std::vector<long long>(3));
-
+		unsigned int iter = 0;
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
 			std::vector<std::vector<long long>> durations(times, std::vector<long long>(3));
@@ -110,12 +112,14 @@ namespace x64
 
 			for(unsigned int i = 0; i < 3; i++)
 			{
-				bench_results[*size][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
+				bench_results[iter][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
 				);				
 			}
+
+			iter++;
 		}
 
 		return bench_results;
@@ -125,7 +129,7 @@ namespace x64
 	m4ri_gpu_benchmark(const std::vector<unsigned int>& arr_sizes, unsigned int times)
 	{
 		std::vector<std::vector<long long>> bench_results(arr_sizes.size(), std::vector<long long>(3));
-
+		unsigned int iter = 0;
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
 			std::vector<std::vector<long long>> durations(times, std::vector<long long>(3));
@@ -198,12 +202,14 @@ namespace x64
 
 			for(unsigned int i = 0; i < 3; i++)
 			{
-				bench_results[*size][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
+				bench_results[iter][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
 				);				
 			}
+
+			iter++;
 		}
 
 		return bench_results;
@@ -213,7 +219,7 @@ namespace x64
 	mar_gpu_benchmark(const std::vector<unsigned int>& arr_sizes, unsigned int times)
 	{
 		std::vector<std::vector<long long>> bench_results(arr_sizes.size(), std::vector<long long>(3));
-
+		unsigned int iter = 0;
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
 			std::vector<std::vector<long long>> durations(times, std::vector<long long>(3));
@@ -274,12 +280,14 @@ namespace x64
 
 			for(unsigned int i = 0; i < 3; i++)
 			{
-				bench_results[*size][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
+				bench_results[iter][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
 				);				
 			}
+
+			iter++;
 		}
 
 		return bench_results;
@@ -289,7 +297,7 @@ namespace x64
 	m4ri_opt_gpu_benchmark(const std::vector<unsigned int>& arr_sizes, unsigned int times)
 	{
 		std::vector<std::vector<long long>> bench_results(arr_sizes.size(), std::vector<long long>(3));
-
+		unsigned int iter = 0;
 		for(auto size = arr_sizes.cbegin(); size != arr_sizes.cend(); size++)
 		{
 			std::vector<std::vector<long long>> durations(times, std::vector<long long>(3));
@@ -376,12 +384,14 @@ namespace x64
 
 			for(unsigned int i = 0; i < 3; i++)
 			{
-				bench_results[*size][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
+				bench_results[iter][i] = std::accumulate(durations.cbegin(), durations.cend(), (long long)0, 
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
 				);				
 			}
+
+			iter++;
 		}
 
 		return bench_results;
