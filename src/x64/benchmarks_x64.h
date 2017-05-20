@@ -59,7 +59,7 @@ namespace x64
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
-				);				
+				) / times;				
 			}
 
 			iter++;
@@ -116,7 +116,7 @@ namespace x64
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
-				);				
+				) / times;				
 			}
 
 			iter++;
@@ -206,7 +206,7 @@ namespace x64
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
-				);				
+				) / times;				
 			}
 
 			iter++;
@@ -284,7 +284,7 @@ namespace x64
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
-				);				
+				) / times;				
 			}
 
 			iter++;
@@ -388,7 +388,7 @@ namespace x64
 					[i](const long long a, const std::vector<long long> v2){
 						return a + v2[i];
 					}
-				);				
+				) / times;				
 			}
 
 			iter++;
