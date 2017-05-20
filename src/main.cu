@@ -58,8 +58,8 @@ bool print_test(const std::string& title,
 
 int main() 
 {
-	const std::vector<unsigned int> arr_sizes{64, 128, 256, 512, 1024};
-	const unsigned int times = 100;
+	const std::vector<unsigned int> arr_sizes{128, 256, 512, 1024, 2048};
+	const unsigned int times = 1;
 
 	bool success;
 	
@@ -134,21 +134,21 @@ int main()
 	
 	//!-----------------------------------------------------------------------------------------------------
 	
-	auto m4ri_opt_gpu_test_results_x86 = x86::m4ri_opt_gpu_test({128, 256, 512, 1024});
-	success = print_test("TEST (x86)M4RI OPTIMIZED GPU matrix multiplication:", {128, 256, 512, 1024}, m4ri_opt_gpu_test_results_x86);
+	auto m4ri_opt_gpu_test_results_x86 = x86::m4ri_opt_gpu_test(arr_sizes);
+	success = print_test("TEST (x86)M4RI OPTIMIZED GPU matrix multiplication:", arr_sizes, m4ri_opt_gpu_test_results_x86);
 	if(success)
 	{
-		auto m4ri_opt_gpu_bench_results_x86 = x86::m4ri_opt_gpu_benchmark({128, 256, 512, 1024}, times);
-		print_bench("BENCH (x86)M4RI OPTIMIZED GPU matrix multiplication:", {128, 256, 512, 1024}, m4ri_opt_gpu_bench_results_x86);
+		auto m4ri_opt_gpu_bench_results_x86 = x86::m4ri_opt_gpu_benchmark(arr_sizes, times);
+		print_bench("BENCH (x86)M4RI OPTIMIZED GPU matrix multiplication:", arr_sizes, m4ri_opt_gpu_bench_results_x86);
 	}
 	std::cout << std::endl;
 	
-	auto m4ri_opt_gpu_test_results_x64 = x64::m4ri_opt_gpu_test({128, 256, 512, 1024});
-	success = print_test("TEST (x64)M4RI OPTIMIZED GPU matrix multiplication:", {128, 256, 512, 1024}, m4ri_opt_gpu_test_results_x64);
+	auto m4ri_opt_gpu_test_results_x64 = x64::m4ri_opt_gpu_test(arr_sizes);
+	success = print_test("TEST (x64)M4RI OPTIMIZED GPU matrix multiplication:", arr_sizes, m4ri_opt_gpu_test_results_x64);
 	if(success)
 	{
-		auto m4ri_opt_gpu_bench_results_x64 = x64::m4ri_opt_gpu_benchmark({128, 256, 512, 1024}, times);
-		print_bench("BENCH (x64)M4RI OPTIMIZED GPU matrix multiplication:", {128, 256, 512, 1024}, m4ri_opt_gpu_bench_results_x64);
+		auto m4ri_opt_gpu_bench_results_x64 = x64::m4ri_opt_gpu_benchmark(arr_sizes, times);
+		print_bench("BENCH (x64)M4RI OPTIMIZED GPU matrix multiplication:", arr_sizes, m4ri_opt_gpu_bench_results_x64);
 	}
 	std::cout << std::endl;
 

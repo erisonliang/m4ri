@@ -3,11 +3,12 @@
 #include <vector>				// std::vector
 #include <cstdint>				// uint32_t
 #include <chrono>				// std::chrono::steady_clock
-
-#include <iostream>
+#include <algorithm>
 
 #include "m4ri_cpu_x86.hpp"
 #include "m4ri_gpu_x86.cu"
+
+#define MAX_THREAD_PER_BLOCK 1024
 
 namespace x86
 {
@@ -162,13 +163,13 @@ namespace x86
 				cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size) / 8, cudaMemcpyHostToDevice);
 				auto transfer_hd_end = std::chrono::steady_clock::now();
 
-				dim3 block_size(std::min(1 << gpu::SUBVECTOR_SIZE, 512));
+				dim3 block_size(std::min(1 << gpu::SUBVECTOR_SIZE, MAX_THREAD_PER_BLOCK));
 				dim3 grid_size((1 << gpu::SUBVECTOR_SIZE) / block_size.x);
 
 				auto prep_begin = std::chrono::steady_clock::now();
 				gpu::m4ri_precalc <<< grid_size, block_size >>> (d_precalc, gpu::SUBVECTOR_SIZE);
 
-				block_size = dim3(std::min(int(*size), 512));
+				block_size = dim3(std::min(int(*size), MAX_THREAD_PER_BLOCK));
 				grid_size  = dim3(*size / block_size.x);
 				
 				gpu::transpose <<< grid_size, block_size >>> (d_B_tr, d_B, *size, *size);
@@ -252,7 +253,7 @@ namespace x86
 				cudaMemcpy((void *)d_B, (const void*)B, (*size) * (*size), cudaMemcpyHostToDevice);
 				auto transfer_hd_end = std::chrono::steady_clock::now();
 
-				dim3 block_size(std::min(int(*size), 512));
+				dim3 block_size(std::min(int(*size), MAX_THREAD_PER_BLOCK));
 				dim3 grid_size((*size) / block_size.x);	
 				
 				auto mult_begin = std::chrono::steady_clock::now();
@@ -344,11 +345,11 @@ namespace x86
 				for(unsigned int i = 0; i < *size / 128; i++)
 				{
 					// всего таблиц для 1 блока-столбца - 32 * (size / 128), общий размер 32 * size / 128 * 64 * sizeof(uint32_t) 
-					dim3 block_size(std::min(int(*size / 4), 512));
-					dim3 grid_size((*size) / block_size.x);	
+					dim3 block_size(std::min(int(*size / 4), MAX_THREAD_PER_BLOCK));
+					dim3 grid_size((*size / 4) / block_size.x);	
 					gpu::m4ri_opt_precalc <<<grid_size, block_size, 0, cuda_streams[i]>>> (d_B, *size, precalc_tables[i], i);
 
-					block_size = dim3(std::min(int(*size), 512));
+					block_size = dim3(std::min(int(*size), MAX_THREAD_PER_BLOCK));
 					grid_size = dim3((*size) / block_size.x);	
 					gpu::m4ri_opt_multiply <<<grid_size, block_size, 0, cuda_streams[i]>>> 
 						(d_A, *size, *size, d_B, *size, *size, d_C, precalc_tables[i], i);
